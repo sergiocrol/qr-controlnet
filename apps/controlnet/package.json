@@ -1,0 +1,14 @@
+{
+  "name": "controlnet",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "python server.py",
+    "build": "echo 'Add build script here'",
+    "start": "python server.py",
+    "test": "echo 'Add test script here'",
+    "lint": "echo 'Add lint script here'",
+    "docker:build": "docker build -t controlnet .",
+    "docker:run": "docker run -p 8080:8080 -v ./results:/app/results controlnet"
+  }
+}
