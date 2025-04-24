@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  # ControlNet service for ML inference
+  controlnet:
+    build:
+      context: ./apps/controlnet
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./shared_results:/app/results
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      - PREFERRED_DEVICE=${PREFERRED_DEVICE:-auto}
+      - PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
+    restart: unless-stopped
+    # GPU configuration for NVIDIA GPUs
+
+    # For M1 Mac, comment out the above
+
+  # Backend API service
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - controlnet
+    environment:
+      - PORT=3000
+      - CONTROLNET_SERVICE_URL=http://controlnet:8080
+      - NODE_ENV=production
+    volumes:
+      - ./shared_results:/app/results
+    restart: unless-stopped
+
+  # Frontend client
+  client:
+    build:
+      context: ./apps/client
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3001:3000"
+    depends_on:
+      - api
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+      - NODE_ENV=production
+    restart: unless-stopped
+
+volumes:
+  huggingface_cache:
+    # Persistent volume for model cache to avoid re-downloading

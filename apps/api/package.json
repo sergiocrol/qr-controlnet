@@ -1,0 +1,12 @@
+{
+  "name": "api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'API service placeholder running' && sleep infinity",
+    "build": "echo 'Building API service'",
+    "start": "echo 'Starting API service'",
+    "lint": "echo 'No linting configured yet'",
+    "test": "echo 'No tests configured yet'"
+  }
+}

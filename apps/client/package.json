@@ -1,0 +1,12 @@
+{
+  "name": "client",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Client service placeholder running' && sleep infinity",
+    "build": "echo 'Building Client service'",
+    "start": "echo 'Starting Client service'",
+    "lint": "echo 'No linting configured yet'",
+    "test": "echo 'No tests configured yet'"
+  }
+}

@@ -12,6 +12,8 @@ def init_models(app):
     logger.info("Initializing models...")
     
     device_preference = os.environ.get('PREFERRED_DEVICE', 'auto')
+    logger.info(f"PREFERRED_DEVICE: {device_preference}")
+
     
     if device_preference == 'cpu':
         device = "cpu"

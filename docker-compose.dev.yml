@@ -1,0 +1,51 @@
+# docker-compose.dev.yml
+version: "3.8"
+
+services:
+  # Development overrides for ControlNet service
+  controlnet:
+    build:
+      target: development
+    volumes:
+      - ./apps/controlnet:/app
+      - /app/venv
+      - /app/__pycache__
+    environment:
+      - DEBUG=True
+      - LOG_LEVEL=DEBUG
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - PREFERRED_DEVICE=cpu
+    # Keep the container running even on errors
+    restart: unless-stopped
+    # Enable hot reloading
+    command: python -m flask run --host=0.0.0.0 --port=8080 --reload
+
+  # Development overrides for API service
+  api:
+    build:
+      target: development
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DEBUG=true
+    # Keep the container running even on errors
+    restart: unless-stopped
+    # Enable hot reloading
+    command: sh -c "echo 'API service placeholder' && tail -f /dev/null"
+
+  # Development overrides for Client service
+  client:
+    build:
+      target: development
+    volumes:
+      - ./apps/client:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    # Keep the container running even on errors
+    restart: unless-stopped
+    # Enable hot reloading
+    command: sh -c "echo 'Client service placeholder' && tail -f /dev/null"
