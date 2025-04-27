@@ -16,7 +16,7 @@ def health():
   try:
       model_loaded = current_app.pipe is not None
       
-      device = current_app.config['DEVICE']
+      device = current_app.config['PREFERRED_DEVICE']
       
       memory_info = {}
       if device == "cuda" and torch.cuda.is_available():

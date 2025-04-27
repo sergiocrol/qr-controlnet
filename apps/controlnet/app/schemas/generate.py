@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields, validates, ValidationError
+from marshmallow import Schema, fields, validate, validates, ValidationError
 
 class GenerateImageSchema(Schema):
     """Schema for validating image generation requests"""
@@ -54,3 +54,14 @@ class GenerateImageSchema(Schema):
     def validate_device(self, value):
         if value and value not in ['auto', 'cpu', 'mps', 'cuda', None]:
             raise ValidationError('Device must be one of: auto, cpu, mps, cuda')
+
+class SageMakerRequestSchema(Schema):
+    """Schema for validating SageMaker async generation requests"""
+    prompt = fields.String(required=True, validate=validate.Length(min=1, max=1000))
+    negative_prompt = fields.String(validate=validate.Length(max=1000))
+    num_inference_steps = fields.Integer(validate=validate.Range(min=1, max=100))
+    controlnet_conditioning_scale = fields.List(fields.Float())
+    control_guidance_start = fields.List(fields.Float())
+    control_guidance_end = fields.List(fields.Float())
+    height = fields.Integer(validate=validate.OneOf([512, 768, 1024]))
+    width = fields.Integer(validate=validate.OneOf([512, 768, 1024]))

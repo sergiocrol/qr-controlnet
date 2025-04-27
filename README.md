@@ -273,3 +273,15 @@ The application could be extended with:
 3. **Additional ControlNets**: More control over artistic style
 4. **Batch Processing**: Handle multiple QR codes
 5. **AWS Deployment**: Scale via SageMaker as planned
+
+## Setup
+
+1. Copy `.env.example` to `.env`:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Set up your AWS credentials in either:
+   - Option 1: Fill in the `.env` file with your AWS credentials
+   - Option 2: Configure AWS credentials locally using `aws configure`

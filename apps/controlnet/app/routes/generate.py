@@ -60,7 +60,7 @@ def generate_image(data):
             logger.error("Model pipeline not initialized")
             return jsonify({"error": "Model not initialized"}), 500
         
-        original_device = current_app.config['DEVICE']
+        original_device = current_app.config['PREFERRED_DEVICE']
         if use_cpu and original_device != "cpu":
             logger.info("Moving model to CPU for this request")
             try:
@@ -70,7 +70,7 @@ def generate_image(data):
                 use_cpu = False
         
         # Apply memory optimizations for MPS (mac M1)
-        if current_app.config['DEVICE'] == "mps" and not use_cpu:
+        if current_app.config['PREFERRED_DEVICE'] == "mps" and not use_cpu:
             logger.info("Applying aggressive memory optimizations for MPS")
             
             import gc
@@ -80,7 +80,7 @@ def generate_image(data):
                 torch.mps.empty_cache()
                 logger.info("Cleared MPS cache")
         
-        device_for_inference = "cpu" if use_cpu else current_app.config['DEVICE']
+        device_for_inference = "cpu" if use_cpu else current_app.config['PREFERRED_DEVICE']
         logger.info(f"Running inference with {num_inference_steps} steps on {device_for_inference}...")
         
         

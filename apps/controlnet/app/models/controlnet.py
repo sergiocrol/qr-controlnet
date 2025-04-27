@@ -36,7 +36,7 @@ def init_models(app):
             device = "cpu"
             logger.warning("No GPU acceleration available. Using CPU which will be much slower.")
 
-    app.config['DEVICE'] = device
+    app.config['PREFERRED_DEVICE'] = device
     logger.info(f"Using device: {device}")
     logger.info(f"Running on: {platform.platform()}")
 

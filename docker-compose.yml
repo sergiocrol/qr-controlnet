@@ -16,9 +16,24 @@ services:
       - PREFERRED_DEVICE=${PREFERRED_DEVICE:-auto}
       - PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
     restart: unless-stopped
-    # GPU configuration for NVIDIA GPUs
 
-    # For M1 Mac, comment out the above
+  # SageMaker container for testing
+  sagemaker-local:
+    build:
+      context: ./apps/controlnet
+      dockerfile: sagemaker/Dockerfile
+      platforms:
+        - ${DOCKER_PLATFORM:-linux/amd64}
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./shared_results:/tmp/results
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      - MODEL=Lykon/DreamShaper
+      - CONTROLNET_MODEL=monster-labs/control_v1p_sd15_qrcode_monster
+      - CONTROLNET_TWO_MODEL=latentcat/control_v1p_sd15_brightness
+    restart: "no"
 
   # Backend API service
   api:

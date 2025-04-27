@@ -74,6 +74,9 @@ logs-%:
 shell-%:
 	docker-compose exec $* sh
 
+shell-sagemaker:
+	docker-compose exec sagemaker-local sh
+
 # Run tests
 test:
 	@echo "Running tests..."
@@ -87,6 +90,45 @@ test-qr:
 test-qr-native:
 	cd ./apps/controlnet && PREFERRED_DEVICE=$(PLATFORM) python test_api.py --image qrs/qr.png --prompt "A giant whale flying in the sky" --size 512 --steps 10 --device $(PLATFORM)
 
+# For local testing on Mac
+sagemaker-build-local:
+	DOCKER_PLATFORM=linux/arm64 docker-compose build sagemaker-local
+
+# For deployment to SageMaker
+sagemaker-build-deploy:
+	DOCKER_PLATFORM=linux/amd64 docker-compose build sagemaker-local
+
+# Run the SageMaker container
+sagemaker-run:
+	docker-compose up sagemaker-local
+
+# Run the SageMaker container in detached mode
+sagemaker-run-detached:
+	docker-compose up -d sagemaker-local
+
+# Test SageMaker inference API with a simple prompt
+sagemaker-test:
+	curl -X POST http://localhost:8081/invocations \
+	  -H "Content-Type: application/json" \
+	  -d '{"prompt": "A futuristic cityscape with neon lights", "num_inference_steps": 10}'
+
+# Test SageMaker health endpoint
+sagemaker-ping:
+	curl http://localhost:8081/ping
+
+# Stop SageMaker container
+sagemaker-stop:
+	docker-compose stop sagemaker-local
+
+# Run the SageMaker test script
+sagemaker-test-full:
+	cd ./apps/controlnet && python sagemaker_test.py --prompt "A giant whale flying in the sky" --steps 10
+
+# Force clean and rebuild the SageMaker container
+sagemaker-rebuild:
+	docker-compose rm -f sagemaker-local
+	docker-compose build --no-cache sagemaker-local
+	
 # Show help
 help:
 	@echo "QR-AI Makefile Commands:"
