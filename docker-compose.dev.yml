@@ -15,7 +15,7 @@ services:
       - LOG_LEVEL=DEBUG
       - FLASK_ENV=development
       - FLASK_DEBUG=1
-      - PREFERRED_DEVICE=cpu
+      - DEVICE=cpu
     # Keep the container running even on errors
     restart: unless-stopped
     # Enable hot reloading

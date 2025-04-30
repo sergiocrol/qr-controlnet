@@ -27,27 +27,27 @@ build-dev-%: init
 
 # Run all services in production mode
 up: init
-	PREFERRED_DEVICE=$(PLATFORM) docker-compose up
+	DEVICE=$(PLATFORM) docker-compose up
 
 # Run all services in detached mode
 up-detached: init
-	PREFERRED_DEVICE=$(PLATFORM) docker-compose up -d
+	DEVICE=$(PLATFORM) docker-compose up -d
 
 # Run all services in development mode
 dev: init
-	PREFERRED_DEVICE=$(PLATFORM) docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+	DEVICE=$(PLATFORM) docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 # Run all services in development mode (detached)
 dev-detached: init
-	PREFERRED_DEVICE=$(PLATFORM) docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+	DEVICE=$(PLATFORM) docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Run a specific service in production mode
 run-%: init
-	PREFERRED_DEVICE=$(PLATFORM) docker-compose up $*
+	DEVICE=$(PLATFORM) docker-compose up $*
 
 # Run a specific service in development mode
 dev-%: init
-	PREFERRED_DEVICE=$(PLATFORM) docker-compose -f docker-compose.yml -f docker-compose.dev.yml up $*
+	DEVICE=$(PLATFORM) docker-compose -f docker-compose.yml -f docker-compose.dev.yml up $*
 
 # Stop all services
 down:
@@ -88,7 +88,7 @@ test-qr:
 
 # Docker containers on macOS cannot access the Mac's MPS hardware acceleration. For development in Mac better test without DOCKER
 test-qr-native:
-	cd ./apps/controlnet && PREFERRED_DEVICE=$(PLATFORM) python test_api.py --image qrs/qr.png --prompt "A giant whale flying in the sky" --size 512 --steps 10 --device $(PLATFORM)
+	cd ./apps/controlnet && DEVICE=$(PLATFORM) python test_api.py --image qrs/qr.png --prompt "A giant whale flying in the sky" --size 512 --steps 10 --device $(PLATFORM)
 
 # For local testing on Mac
 sagemaker-build-local:
@@ -108,9 +108,11 @@ sagemaker-run-detached:
 
 # Test SageMaker inference API with a simple prompt
 sagemaker-test:
-	curl -X POST http://localhost:8081/invocations \
-	  -H "Content-Type: application/json" \
-	  -d '{"prompt": "A futuristic cityscape with neon lights", "num_inference_steps": 10}'
+	aws sagemaker-runtime invoke-endpoint \
+	  --endpoint-name controlnet-qr-endpoint \
+	  --content-type application/json \
+	  --body '{"prompt": "A futuristic cityscape with neon lights", "num_inference_steps": 10}' \
+	  output.json
 
 # Test SageMaker health endpoint
 sagemaker-ping:
@@ -128,6 +130,13 @@ sagemaker-test-full:
 sagemaker-rebuild:
 	docker-compose rm -f sagemaker-local
 	docker-compose build --no-cache sagemaker-local
+	
+# Test the API Gateway integration
+test-api-gateway:
+	curl -X POST \
+	  https://j2qfjsaffb.execute-api.eu-west-1.amazonaws.com/prod/generate \
+	  -H 'Content-Type: application/json' \
+	  -d '{"prompt": "A futuristic cityscape with neon lights", "num_inference_steps": 10}'
 	
 # Show help
 help:

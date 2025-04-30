@@ -1,10 +1,9 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, current_app
 from ..utils.logging import get_logger
 from ..utils.validation import validate_schema
 from ..schemas.generate import SageMakerRequestSchema
 import boto3
 import json
-import os
 
 logger = get_logger(__name__)
 sagemaker_bp = Blueprint('sagemaker', __name__)

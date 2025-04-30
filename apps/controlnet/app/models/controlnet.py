@@ -11,24 +11,17 @@ def init_models(app):
     """Initialize the ControlNet models with memory optimizations"""
     logger.info("Initializing models...")
     
-    device_preference = os.environ.get('PREFERRED_DEVICE', 'auto')
-    logger.info(f"PREFERRED_DEVICE: {device_preference}")
+    device_preference = os.environ.get('DEVICE', 'cuda')
+    logger.info(f"DEVICE: {device_preference}")
 
-    
     if device_preference == 'cpu':
         device = "cpu"
         logger.info("Using CPU as per environment preference")
-    elif device_preference == 'mps' and torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        device = "mps"
-        logger.info("Using MPS (Apple Silicon) as per environment preference")
     elif device_preference == 'cuda' and torch.cuda.is_available():
         device = "cuda"
         logger.info("Using CUDA as per environment preference")
     else:
-        if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-            device = "mps"
-            logger.info("Using MPS (Apple Silicon) acceleration")
-        elif torch.cuda.is_available():
+        if torch.cuda.is_available():
             device = "cuda"
             logger.info(f"Using CUDA with {torch.cuda.device_count()} GPU(s)")
             logger.info(f"GPU Name: {torch.cuda.get_device_name(0)}")
@@ -36,15 +29,11 @@ def init_models(app):
             device = "cpu"
             logger.warning("No GPU acceleration available. Using CPU which will be much slower.")
 
-    app.config['PREFERRED_DEVICE'] = device
+    app.config['DEVICE'] = device
     logger.info(f"Using device: {device}")
     logger.info(f"Running on: {platform.platform()}")
 
     try:
-        if device == "mps":
-            os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = os.environ.get("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
-            logger.info(f"Set MPS high watermark ratio to {os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO']}")
-
         gc.collect()
         
         logger.info(f"Loading base model: {app.config['MODEL']}")
@@ -79,8 +68,7 @@ def init_models(app):
                 
                 controlnet = ControlNetModel.from_pretrained(
                     model_id,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-                    low_cpu_mem_usage=True
+                    torch_dtype=torch.float16 if device == "cuda" else torch.float32
                 )
                 logger.info(f"Successfully loaded QR ControlNet model: {model_id}")
                 qr_model_loaded = True
@@ -92,8 +80,7 @@ def init_models(app):
                     controlnet = ControlNetModel.from_pretrained(
                         model_id,
                         subfolder="v2",
-                        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-                        low_cpu_mem_usage=True
+                        torch_dtype=torch.float16 if device == "cuda" else torch.float32
                     )
                     logger.info(f"Successfully loaded QR ControlNet model: {model_id} (with subfolder v2)")
                     qr_model_loaded = True
@@ -113,8 +100,7 @@ def init_models(app):
                 logger.info(f"Attempting to load Brightness ControlNet model: {model_id}")
                 controlnet_two = ControlNetModel.from_pretrained(
                     model_id,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-                    low_cpu_mem_usage=True
+                    torch_dtype=torch.float16 if device == "cuda" else torch.float32
                 )
                 logger.info(f"Successfully loaded Brightness ControlNet model: {model_id}")
                 brightness_model_loaded = True
@@ -133,8 +119,7 @@ def init_models(app):
             app.config['MODEL'],
             controlnet=controlnet,
             safety_checker=None,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            low_cpu_mem_usage=True
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32
         )
 
         logger.info(f"Moving models to {device} device...")

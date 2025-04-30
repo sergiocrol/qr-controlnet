@@ -1,8 +1,6 @@
 import os
 import base64
-import json
 import torch
-import numpy as np
 from PIL import Image
 from io import BytesIO
 import uuid
@@ -17,11 +15,21 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 class QRControlNetInference:
   def __init__(self):
+
+    import subprocess
+    print("GPU information:")
+
+    try:
+      subprocess.run(["nvidia-smi"], check=False)
+    except:
+      print("Failed to run nvidia-smi") 
+
     # First set the device
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"CUDA device count: {torch.cuda.device_count()}")
     if torch.cuda.is_available():
+        print(f"CUDA device: {torch.cuda.get_device_name(0)}")
         self.device = "cuda"
-    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        self.device = "mps"
     else:
         self.device = "cpu"
     

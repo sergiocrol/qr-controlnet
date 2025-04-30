@@ -13,7 +13,7 @@ services:
       - ./shared_results:/app/results
       - huggingface_cache:/root/.cache/huggingface
     environment:
-      - PREFERRED_DEVICE=${PREFERRED_DEVICE:-auto}
+      - DEVICE=${DEVICE:-auto}
       - PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
     restart: unless-stopped
 
