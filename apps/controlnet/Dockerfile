@@ -14,9 +14,11 @@ ENV CONTROLNET_TWO_MODEL="latentcat/control_v1p_sd15_brightness"
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-WORKDIR /workspace/ControlNet
+WORKDIR /opt/program
+COPY . /opt/program/
+ENV PYTHONPATH=/opt/program
 
-COPY . .
+ENTRYPOINT ["python", "app/serve.py"]
 
 # Expose port 8080 for SageMaker
 EXPOSE 8080

@@ -1,27 +1,16 @@
 import os
 from dotenv import load_dotenv
 from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent
-
-ENV = "production"
-
-load_dotenv()
-
-env_file = BASE_DIR / ".env"
-if env_file.exists():
-    load_dotenv(env_file)
-
-prod_env = BASE_DIR / ".env.production" 
-if prod_env.exists():
-    load_dotenv(prod_env)
-
 import boto3
 import time
 import sagemaker
 from sagemaker.model import Model
 from sagemaker.async_inference.async_inference_config import AsyncInferenceConfig
 
+BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env.production") 
 
 def deploy_sagemaker_endpoint():
   aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
@@ -137,6 +126,14 @@ def deploy_sagemaker_endpoint():
     image_uri=image_uri,
     role=role,
     name=model_name,
+    env={
+        "MODEL": os.environ.get("MODEL", "Lykon/DreamShaper"),
+        "CONTROLNET_MODEL": os.environ.get("CONTROLNET_MODEL", "monster-labs/control_v1p_sd15_qrcode_monster"),
+        "CONTROLNET_TWO_MODEL": os.environ.get("CONTROLNET_TWO_MODEL", "latentcat/control_v1p_sd15_brightness"),
+        "DEVICE": "cuda",
+        "NUM_INFERENCE_STEPS": os.environ.get("NUM_INFERENCE_STEPS", "30"),
+        "RESULTS_DIR": "/opt/program/results"
+    },
     sagemaker_session=sagemaker_session
   )
 
@@ -202,6 +199,7 @@ def deploy_sagemaker_endpoint():
 def setup_autoscaling(endpoint_name):
   """Configure auto-scaling for the endpoint to scale down to zero when idle"""
   import boto3
+  import time
   
   app_autoscaling = boto3.client('application-autoscaling')
   cloudwatch = boto3.client('cloudwatch')

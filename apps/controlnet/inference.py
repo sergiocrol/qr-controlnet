@@ -6,7 +6,11 @@ from io import BytesIO
 import uuid
 from diffusers import StableDiffusionControlNetPipeline, ControlNetModel as DiffusersControlNetModel
 
-DEFAULT_QR_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "qrs", "qr.png")
+DEFAULT_QR_PATH = os.path.join("/opt/program", "qrs", "qr.png")
+alternative_paths = [
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "qrs", "qr.png"),
+    "./qrs/qr.png"
+]
 print(f"Looking for default QR at: {DEFAULT_QR_PATH}")
 
 RESULTS_DIR = os.environ.get('RESULTS_DIR', '/tmp/results')

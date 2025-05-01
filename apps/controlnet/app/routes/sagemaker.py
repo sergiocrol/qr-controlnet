@@ -91,34 +91,103 @@ def check_async_status(request_id):
   
 @sagemaker_bp.route('/generate/async/result/<request_id>', methods=['GET'])
 def get_async_result(request_id):
-  try:
-    s3_client = boto3.client('s3')
-    
-    sagemaker_session = boto3.Session().client('sagemaker')
-    default_bucket = sagemaker_session.describe_endpoint(EndpointName="controlnet-qr-endpoint")['EndpointArn'].split(':')[5].split('/')[0]
-    
     try:
-      response = s3_client.get_object(
-        Bucket=default_bucket,
-        Key=f"controlnet-qr-output/{request_id}/output.json"
-      )
-      
-      result = json.loads(response['Body'].read().decode())
-      
-      if 'image' in result and result['image']:
-        pass
-          
-      return jsonify({
-        "status": "COMPLETED",
-        "result": result
-      })
+        s3_client = boto3.client('s3')
         
-    except s3_client.exceptions.NoSuchKey:
-      return jsonify({
-        "status": "PROCESSING",
-        "message": "Result not available yet"
-      })
+        # Get the SageMaker default bucket
+        sagemaker_session = boto3.Session().client('sagemaker')
+        endpoint_response = sagemaker_session.describe_endpoint(EndpointName="controlnet-qr-endpoint")
+        default_bucket = endpoint_response['EndpointArn'].split(':')[5].split('/')[0]
+        
+        key = f"controlnet-qr-output/{request_id}/output.json"
+        logger.info(f"Looking for result in s3://{default_bucket}/{key}")
+        
+        try:
+            # Try to get the result from S3
+            response = s3_client.get_object(
+                Bucket=default_bucket,
+                Key=key
+            )
+            
+            # Parse the JSON result
+            result = json.loads(response['Body'].read().decode())
+            
+            # Handle the image data - typically this is base64 encoded
+            if 'image' in result and result['image']:
+                # Optionally decode or process the base64 image here if needed
+                # For example, you might want to verify it's valid base64
+                import base64
+                try:
+                    base64.b64decode(result['image'])
+                    logger.info("Successfully validated base64 image data")
+                except Exception as img_error:
+                    logger.error(f"Invalid base64 image data: {str(img_error)}")
+                    result['image_valid'] = False
+                else:
+                    result['image_valid'] = True
+                
+                # Add additional metadata about the result
+                result['image_size_bytes'] = len(result['image'])
+                
+                # Add S3 reference for direct access if needed
+                result['s3_reference'] = {
+                    'bucket': default_bucket,
+                    'key': key
+                }
+                
+                # If there's an output path in the result, verify it exists
+                if 'output_path' in result:
+                    # Extract just the filename from the path
+                    filename = os.path.basename(result['output_path'])
+                    # Construct the S3 key for the image file
+                    image_key = f"controlnet-qr-output/{request_id}/{filename}"
+                    
+                    try:
+                        # Check if the image file exists in S3
+                        s3_client.head_object(Bucket=default_bucket, Key=image_key)
+                        result['image_file_s3'] = f"s3://{default_bucket}/{image_key}"
+                    except Exception as s3_err:
+                        logger.warning(f"Image file not found in S3: {str(s3_err)}")
+                        result['image_file_s3'] = None
+            
+            return jsonify({
+                "status": "COMPLETED",
+                "result": result,
+                "request_id": request_id,
+                "timestamp": int(time.time())
+            })
+                
+        except s3_client.exceptions.NoSuchKey:
+            # The key doesn't exist yet - the processing might still be ongoing
+            logger.info(f"Result not yet available for request_id: {request_id}")
+            
+            # Check the job status
+            try:
+                job_response = sagemaker_session.describe_inference_job(
+                    JobName=request_id
+                )
+                status = job_response.get('Status', 'UNKNOWN')
+            except Exception as job_err:
+                logger.warning(f"Could not check job status: {str(job_err)}")
+                status = "PROCESSING"  # Assume still processing if we can't check
+            
+            return jsonify({
+                "status": status,
+                "message": "Result not available yet, processing in progress",
+                "request_id": request_id
+            })
+        
+        except Exception as fetch_error:
+            logger.error(f"Error fetching result from S3: {str(fetch_error)}")
+            return jsonify({
+                "status": "ERROR",
+                "error": f"Failed to fetch result: {str(fetch_error)}",
+                "request_id": request_id
+            }), 500
           
-  except Exception as e:
-    logger.exception(f"Error retrieving async result: {str(e)}")
-    return jsonify({"error": f"Failed to retrieve result: {str(e)}"}), 500
+    except Exception as e:
+        logger.exception(f"Error retrieving async result: {str(e)}")
+        return jsonify({
+            "error": f"Failed to retrieve result: {str(e)}",
+            "request_id": request_id
+        }), 500
