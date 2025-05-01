@@ -15,4 +15,4 @@ class Config:
 
   INIT_IMAGE = os.environ.get('INIT_IMAGE', "./qrs/qr.png")
 
-  RESULTS_DIR = os.environ.get('RESULTS_DIR', './results')
+  RESULTS_DIR = os.environ.get('RESULTS_DIR', '/opt/ml/model/results')

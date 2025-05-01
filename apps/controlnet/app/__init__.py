@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request, jsonify, Response
 import inference
 import json
 
@@ -18,16 +18,16 @@ def create_app(config_class=Config):
   @app.route("/ping", methods=['GET'])
   def ping():
     inference.get_model()
-    return flask.Response(response=json.dumps({"status": "healthy"}), status=200)
+    return Response(response=json.dumps({"status": "healthy"}), status=200)
 
   @app.route('/invocations', methods=['POST'])
   def invoke():
     # inference endpoint required by SM
     try:
-      if flask.request.content_type == 'application/json':
-        input_data = flask.request.get_json()
+      if request.content_type == 'application/json':
+        input_data = request.get_json()
       else:
-        return flask.Response(
+        return Response(
           response=json.dumps({"error": "Unsupported content type"}),
           status=415, mimetype='application/json'
         )
@@ -35,7 +35,7 @@ def create_app(config_class=Config):
       # Extract params
       prompt = input_data.get("prompt")
       if not prompt:
-        return flask.Response(
+        return Response(
           response=json.dumps({"error": "No prompt provided"}),
           status=400, mimetype='application/json'
         )
@@ -52,7 +52,7 @@ def create_app(config_class=Config):
         width=input_data.get("width"),
       )
 
-      return flask.Response(
+      return Response(
         response=json.dumps(result),
         status=200, mimetype='application/json'
       )
@@ -62,7 +62,7 @@ def create_app(config_class=Config):
       error_traceback = traceback.format_exc()
       print(f"Error during invocation: {str(e)}")
       print(f"Traceback: {error_traceback}")
-      return flask.Response(
+      return Response(
         response=json.dumps({
           "error": str(e),
           "traceback": error_traceback
