@@ -42,20 +42,11 @@ def init_models(app):
         logger.info("Loading ControlNet models with memory optimization...")
         
         qr_model_options = [
-            app.config['CONTROLNET_MODEL'],                    
-            "monster-labs/control_v1p_sd15_qrcode_monster",   
-            "monster-labs/control_v1p_sd15_qrcode",            
-            "monster-labs/control_v1p_sd15_qrcode_monster_v2"  
+            app.config['CONTROLNET_MODEL'] 
         ]
         
         brightness_model_options = [
-            app.config['CONTROLNET_TWO_MODEL'],                
-            "latentcat/control_v1p_sd15_brightness",           
-            "lllyasviel/control_v11p_sd15_brightness",         
-            "lllyasviel/sd-controlnet-brightness",             
-            "SG161222/Realistic_Vision_V5.1_noVAE",            
-            "furusu/control_v1p_sd15_brightness_fp16",         
-            "ioclab/control_v1p_sd15_brightness"               
+            app.config['CONTROLNET_TWO_MODEL']               
         ]
         
          # ControlNet model (qrcode monster)
@@ -68,7 +59,7 @@ def init_models(app):
                 
                 controlnet = ControlNetModel.from_pretrained(
                     model_id,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32
+                    subfolder="v2",
                 )
                 logger.info(f"Successfully loaded QR ControlNet model: {model_id}")
                 qr_model_loaded = True
@@ -76,11 +67,9 @@ def init_models(app):
             except Exception as e:
                 logger.warning(f"Failed to load QR model {model_id} without subfolder: {str(e)}")
                 try:
-                    # Try with subfolder v2
                     controlnet = ControlNetModel.from_pretrained(
                         model_id,
                         subfolder="v2",
-                        torch_dtype=torch.float16 if device == "cuda" else torch.float32
                     )
                     logger.info(f"Successfully loaded QR ControlNet model: {model_id} (with subfolder v2)")
                     qr_model_loaded = True
@@ -100,7 +89,6 @@ def init_models(app):
                 logger.info(f"Attempting to load Brightness ControlNet model: {model_id}")
                 controlnet_two = ControlNetModel.from_pretrained(
                     model_id,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32
                 )
                 logger.info(f"Successfully loaded Brightness ControlNet model: {model_id}")
                 brightness_model_loaded = True
@@ -112,6 +100,7 @@ def init_models(app):
             logger.warning("Failed to load Brightness ControlNet model. Proceeding with QR model only.")
             controlnet = [controlnet]
         else:
+            logger.info("Both ControlNet models loaded successfully")
             controlnet = [controlnet, controlnet_two]
         
         logger.info(f"Loading Stable Diffusion pipeline: {app.config['MODEL']}")
@@ -119,30 +108,29 @@ def init_models(app):
             app.config['MODEL'],
             controlnet=controlnet,
             safety_checker=None,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32
         )
 
         logger.info(f"Moving models to {device} device...")
         pipe.to(device)
 
-        logger.info("Applying memory optimizations...")
+        # logger.info("Applying memory optimizations...")
         
-        if hasattr(pipe, 'enable_attention_slicing'):
-            pipe.enable_attention_slicing(1)
-            logger.info("Enabled attention slicing for memory optimization")
+        # if hasattr(pipe, 'enable_attention_slicing'):
+        #     pipe.enable_attention_slicing(1)
+        #     logger.info("Enabled attention slicing for memory optimization")
         
-        if hasattr(pipe, 'enable_vae_slicing'):
-            pipe.enable_vae_slicing()
-            logger.info("Enabled VAE slicing")
+        # if hasattr(pipe, 'enable_vae_slicing'):
+        #     pipe.enable_vae_slicing()
+        #     logger.info("Enabled VAE slicing")
         
-        if device == "cuda":
-            try:
-                pipe.enable_xformers_memory_efficient_attention()
-                logger.info("Enabled xformers memory efficient attention")
-            except Exception as e:
-                logger.warning(f"Could not enable xformers: {str(e)}")
+        # if device == "cuda":
+        #     try:
+        #         pipe.enable_xformers_memory_efficient_attention()
+        #         logger.info("Enabled xformers memory efficient attention")
+        #     except Exception as e:
+        #         logger.warning(f"Could not enable xformers: {str(e)}")
         
-        logger.info("Models initialized successfully")
+        # logger.info("Models initialized successfully")
         return pipe
         
     except Exception as e:

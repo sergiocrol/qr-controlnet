@@ -22,11 +22,11 @@ def generate_async(data):
       "prompt": prompt,
       "negative_prompt": data.get("negative_prompt", "ugly, blurry, pixelated, low quality, text, watermark"),
       "num_inference_steps": data.get("num_inference_steps", current_app.config['NUM_INFERENCE_STEPS']),
-      "controlnet_conditioning_scale": data.get("controlnet_conditioning_scale", [1.0, 0.5]),
-      "control_guidance_start": data.get("control_guidance_start", [0.0, 0.0]),
+      "controlnet_conditioning_scale": data.get("controlnet_conditioning_scale", [1.25, 0.1]),
+      "control_guidance_start": data.get("control_guidance_start", [0.0, 0.01]),
       "control_guidance_end": data.get("control_guidance_end", [1.0, 1.0]),
-      "height": data.get("height", 768),
-      "width": data.get("width", 768),
+      "height": data.get("height", 1024),
+      "width": data.get("width", 1024),
     }
 
     response = runtime.invoke_endpoint_async(
