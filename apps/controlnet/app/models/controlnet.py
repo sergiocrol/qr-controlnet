@@ -113,24 +113,6 @@ def init_models(app):
         logger.info(f"Moving models to {device} device...")
         pipe.to(device)
 
-        # logger.info("Applying memory optimizations...")
-        
-        # if hasattr(pipe, 'enable_attention_slicing'):
-        #     pipe.enable_attention_slicing(1)
-        #     logger.info("Enabled attention slicing for memory optimization")
-        
-        # if hasattr(pipe, 'enable_vae_slicing'):
-        #     pipe.enable_vae_slicing()
-        #     logger.info("Enabled VAE slicing")
-        
-        # if device == "cuda":
-        #     try:
-        #         pipe.enable_xformers_memory_efficient_attention()
-        #         logger.info("Enabled xformers memory efficient attention")
-        #     except Exception as e:
-        #         logger.warning(f"Could not enable xformers: {str(e)}")
-        
-        # logger.info("Models initialized successfully")
         return pipe
         
     except Exception as e:
