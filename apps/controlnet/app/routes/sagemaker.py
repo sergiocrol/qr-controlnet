@@ -27,6 +27,9 @@ def generate_async(data):
       "control_guidance_end": data.get("control_guidance_end", [1.0, 1.0]),
       "height": data.get("height", 1024),
       "width": data.get("width", 1024),
+      "sampler": data.get("sampler", "dpm++_2m_karras"),
+      "guidance_scale": data.get("guidance_scale", 7.5),
+      "model": data.get("model", "ghostmix"),
     }
 
     response = runtime.invoke_endpoint_async(

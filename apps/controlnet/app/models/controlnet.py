@@ -110,6 +110,8 @@ def init_models(app):
             safety_checker=None,
         )
 
+        pipe.enable_xformers_memory_efficient_attention()
+
         logger.info(f"Moving models to {device} device...")
         pipe.to(device)
 

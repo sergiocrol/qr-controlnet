@@ -5,6 +5,20 @@ from PIL import Image
 from io import BytesIO
 import uuid
 from diffusers import StableDiffusionControlNetPipeline, ControlNetModel as DiffusersControlNetModel
+from diffusers.schedulers import (
+    DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+    UniPCMultistepScheduler,
+    HeunDiscreteScheduler,
+    KDPM2DiscreteScheduler,
+    KDPM2AncestralDiscreteScheduler,
+    DEISMultistepScheduler,
+    DPMSolverSinglestepScheduler
+)
 
 DEFAULT_QR_PATH = os.path.join("/opt/program", "qrs", "qr.png")
 alternative_paths = [
@@ -17,8 +31,15 @@ RESULTS_DIR = os.environ.get('RESULTS_DIR', '/tmp/results')
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+MODEL_MAP = {
+  "dreamshaper": "Lykon/DreamShaper",
+  "ghostmix": "digiplay/GhostMixV1.2VAE"
+}
+
+DEFAULT_MODEL = "ghostmix"
+
 class QRControlNetInference:
-  def __init__(self):
+  def __init__(self, model_name=None):
 
     import subprocess
     print("GPU information:")
@@ -40,12 +61,29 @@ class QRControlNetInference:
     print(f"Using device: {self.device}")
 
     # Model configs
-    self.model = os.environ.get('MODEL', "Lykon/DreamShaper")
+    self.set_model(model_name)
     self.controlnet_model = os.environ.get('CONTROLNET_MODEL', "monster-labs/control_v1p_sd15_qrcode_monster")
     self.controlnet_two_model = os.environ.get('CONTROLNET_TWO_MODEL', "latentcat/control_v1p_sd15_brightness")
 
     self.pipe = None
     self.load_model()
+
+  def set_model(self, model_name=None):
+    """Set the base model to use for generation"""
+    if model_name is None:
+        model_name = os.environ.get('MODEL_NAME', DEFAULT_MODEL)
+        
+    model_name = model_name.lower()
+    
+    if model_name in MODEL_MAP:
+        self.model = MODEL_MAP[model_name]
+    else:
+        # Default to DreamShaper if the model name is not recognized
+        print(f"Warning: Model '{model_name}' not found in model map. Using {DEFAULT_MODEL} instead.")
+        self.model = MODEL_MAP[DEFAULT_MODEL]
+    
+    print(f"Using model: {self.model}")
+    return self.model
   
   def load_model(self):
     print("Loading controlnet models...")
@@ -67,16 +105,45 @@ class QRControlNetInference:
       torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
     )
 
-    self.pipe = self.pipe.to(self.device)
+    self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+      self.pipe.scheduler.config,
+      algorithm_type="dpmsolver++",
+      use_karras_sigmas=True
+    )
 
-    # model memory optimizations (OPTIONAL. Remove if not working properly)
-    if self.device == "cuda":
-      self.pipe.enable_xformers_memory_efficient_attention()
+    self.pipe = self.pipe.to(self.device)
     
     print("Model loading complete")
 
+  def get_scheduler(self, sampler_name="dpm++_2m_karras"):
+    config = self.pipe.scheduler.config
+    
+    schedulers = {
+      "ddim": (DDIMScheduler, {}),
+      "pndm": (PNDMScheduler, {}),
+      "lms": (LMSDiscreteScheduler, {}),
+      "euler": (EulerDiscreteScheduler, {}),
+      "euler_a": (EulerAncestralDiscreteScheduler, {}),
+      "dpm++_2m": (DPMSolverMultistepScheduler, {"algorithm_type": "dpmsolver++"}),
+      "dpm++_2m_karras": (DPMSolverMultistepScheduler, {"algorithm_type": "dpmsolver++", "use_karras_sigmas": True}),
+      "dpm++_sde": (DPMSolverMultistepScheduler, {"algorithm_type": "dpmsolver++", "solver_order": 2, "use_karras_sigmas": True}),
+      "dpm++_sde_karras": (DPMSolverMultistepScheduler, {"algorithm_type": "dpmsolver++", "solver_order": 2, "use_karras_sigmas": True}),
+      "heun": (HeunDiscreteScheduler, {}),
+      "dpm_2": (KDPM2DiscreteScheduler, {}),
+      "dpm_2_a": (KDPM2AncestralDiscreteScheduler, {}),
+      "unipc": (UniPCMultistepScheduler, {}),
+      "deis": (DEISMultistepScheduler, {}),
+      "dpm_fast": (DPMSolverSinglestepScheduler, {})
+    }
+    
+    if sampler_name.lower() not in schedulers:
+      print(f"Warning: Sampler {sampler_name} not recognized, defaulting to 'dpm++_2m_karras'")
+      sampler_name = "dpm++_2m_karras"
+    
+    scheduler_class, params = schedulers[sampler_name.lower()]
+    return scheduler_class.from_config(config, **params)
+
   def generate(self, prompt, **kwargs):
-    """Generate an image based on a prompt and a QR code"""
     print(f"Starting generation with prompt: {prompt}")
     print(f"kwargs: {kwargs}")
 
@@ -101,6 +168,11 @@ class QRControlNetInference:
           print(f"Failed to load from {alt_path}: {str(alt_e)}")
       else:
         raise
+    
+    sampler = kwargs.get("sampler", "dpm++_2m_karras")
+    if sampler:
+      self.pipe.scheduler = self.get_scheduler(sampler)
+      print(f"Using sampler: {sampler}")
 
     controlnet_scale = kwargs.get("controlnet_conditioning_scale")
     if controlnet_scale is None:
@@ -124,10 +196,16 @@ class QRControlNetInference:
     print(f"Parameter values: {params}")
 
     print(f"Running inference with prompt: {prompt[:50]}...")
+    seed = kwargs.get("seed", None)
+    if seed is not None:
+        generator = torch.Generator(device=self.device).manual_seed(seed)
+    else:
+        generator = None
 
     result = self.pipe(
       prompt=prompt,
-      image=[image, image],  # Same image for both controlnets
+      image=[image, image],
+      generator=generator,
       **params
     )
 

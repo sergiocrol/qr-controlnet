@@ -127,7 +127,7 @@ def deploy_sagemaker_endpoint():
     role=role,
     name=model_name,
     env={
-        "MODEL": os.environ.get("MODEL", "Lykon/DreamShaper"),
+        "MODEL": os.environ.get("MODEL", "digiplay/GhostMixV1.2VAE"),
         "CONTROLNET_MODEL": os.environ.get("CONTROLNET_MODEL", "monster-labs/control_v1p_sd15_qrcode_monster"),
         "CONTROLNET_TWO_MODEL": os.environ.get("CONTROLNET_TWO_MODEL", "latentcat/control_v1p_sd15_brightness"),
         "DEVICE": "cuda",

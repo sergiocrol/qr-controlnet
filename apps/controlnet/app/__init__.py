@@ -50,6 +50,9 @@ def create_app(config_class=Config):
         control_guidance_end=input_data.get("control_guidance_end"),
         height=input_data.get("height"),
         width=input_data.get("width"),
+        sampler=input_data.get("sampler", "dpm++_2m_karras"),
+        guidance_scale=input_data.get("guidance_scale", 7.5),
+        model=input_data.get("model"),
       )
 
       return Response(
