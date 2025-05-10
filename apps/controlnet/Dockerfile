@@ -1,17 +1,19 @@
 # Use the PyTorch CUDA base image to ensure GPU compatibility
-FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
-
-# Label the image
-LABEL maintainer="Your Name <your.email@example.com>"
-LABEL description="ControlNet QR Code Generator for SageMaker"
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-devel
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
-    libglib2.0-0 \
-    wget \
-    curl \
+    build-essential \
+    ninja-build \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# Set CUDA environment variables
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
 # Set up directories expected by SageMaker
 RUN mkdir -p /opt/ml/model \
@@ -49,8 +51,11 @@ ENV MODEL="Lykon/DreamShaper" \
     CONTROLNET_MODEL="monster-labs/control_v1p_sd15_qrcode_monster" \
     CONTROLNET_TWO_MODEL="latentcat/control_v1p_sd15_brightness" \
     RESULTS_DIR="/opt/ml/model/results" \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    NVIDIA_VISIBLE_DEVICES=all  \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    PYTHONUNBUFFERED=TRUE \
+    PYTHONDONTWRITEBYTECODE=TRUE \
+    PATH="/opt/program:${PATH}"
 
 # Command to run when container starts - this uses the same entry point
 # whether running locally or in SageMaker

@@ -14,7 +14,8 @@ marshmallow==3.21.3
 peft==0.10.0
 
 # Replace the specific xformers version with a compatible one
-xformers>=0.0.21,<0.1.0
+xformers>=0.0.21
+flash-attn>=2.0.0
 
 # Utilities
 tqdm==4.66.4
