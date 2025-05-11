@@ -1,71 +1,62 @@
-# apps/controlnet/Dockerfile
-
-# Base stage with common dependencies
-FROM python:3.10-slim AS base
-
-WORKDIR /app
+# Use the PyTorch CUDA base image to ensure GPU compatibility
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-devel
 
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential \
     libgl1-mesa-glx \
-    libglib2.0-0 \
-    curl \
-    wget && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    build-essential \
+    ninja-build \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Development stage with hot reloading
-FROM base AS development
+# Set CUDA environment variables
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
-# Set environment for development
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    FLASK_APP=server.py \
-    FLASK_ENV=development \
-    PYTHONPATH=/app \
-    DEBUG=True \
-    PREFERRED_DEVICE=cpu \
-    PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
+# Set up directories expected by SageMaker
+RUN mkdir -p /opt/ml/model \
+    /opt/ml/input/data \
+    /opt/ml/model/code \
+    /opt/ml/output \
+    /opt/program \
+    /opt/ml/model/results
 
-# Copy requirements first (for better caching)
-COPY requirements.txt .
+# Set the working directory
+WORKDIR /opt/program
+
+# Copy requirements and install dependencies
+COPY requirements.txt /opt/program/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create directories
-RUN mkdir -p /results
+# Copy the QR code templates
+COPY /app/qrs /opt/program/qrs
 
-# Expose port
+# Copy the application code
+COPY . /opt/program/
+
+# Create a symlink to ensure code is accessible via both paths
+# This makes the codebase work both in SageMaker and local development
+RUN ln -s /opt/program /opt/ml/model/code
+
+# Make the serve script executable
+RUN chmod +x /opt/program/serve
+
+# Port used by the SageMaker container
 EXPOSE 8080
 
-# Command for development (will be overridden in docker-compose.dev.yml)
-CMD ["python", "server.py"]
+# Environment variables
+ENV MODEL="digiplay/GhostMixV1.2VAE" \
+    CONTROLNET_MODEL="monster-labs/control_v1p_sd15_qrcode_monster" \
+    CONTROLNET_TWO_MODEL="latentcat/control_v1p_sd15_brightness" \
+    RESULTS_DIR="/opt/ml/model/results" \
+    NVIDIA_VISIBLE_DEVICES=all  \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    PYTHONUNBUFFERED=TRUE \
+    PYTHONDONTWRITEBYTECODE=TRUE \
+    PATH="/opt/program:${PATH}"
 
-# Production stage
-FROM base AS production
-
-# Set environment for production
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    FLASK_APP=server.py \
-    PYTHONPATH=/app
-
-# Copy requirements first (for better caching)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
-# Create directory for results
-RUN mkdir -p /results
-
-# Expose port
-EXPOSE 8080
-
-# Set up volume for results
-VOLUME ["/results"]
-
-# Command to run the application
-CMD ["python", "server.py"]
+# Command to run when container starts - this uses the same entry point
+# whether running locally or in SageMaker
+ENTRYPOINT ["python", "-m", "serve"]

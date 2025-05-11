@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+import sys
+import signal
+from app import create_app
+
+# The flask app for serving predictions
+app = create_app()
+
+# Signal handlers for graceful shutdown
+def sigterm_handler(signum, frame):
+    print("Received SIGTERM. Shutting down...")
+    sys.exit(0)
+
+def sigint_handler(signum, frame):
+    print("Received SIGINT. Shutting down...")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, sigterm_handler)
+signal.signal(signal.SIGINT, sigint_handler)
+
+if __name__ == "__main__":
+    # Run the server
+    app.run(host="0.0.0.0", port=8080)

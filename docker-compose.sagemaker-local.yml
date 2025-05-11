@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  # SageMaker-compatible local testing container
+  sagemaker-local:
+    build:
+      context: ./apps/controlnet
+      dockerfile: Dockerfile
+      args:
+        - BUILD_ENV=production
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./shared_results:/opt/ml/model/results
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      - MODEL=Lykon/DreamShaper
+      - CONTROLNET_MODEL=monster-labs/control_v1p_sd15_qrcode_monster
+      - CONTROLNET_TWO_MODEL=latentcat/control_v1p_sd15_brightness
+      - DEVICE=cpu # Set to 'cuda' if you have a GPU
+      - LOG_LEVEL=DEBUG
+      # SageMaker specific environment variables
+      - SAGEMAKER_PROGRAM=sagemaker_serve.py
+      - SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/model
+      - SAGEMAKER_CONTAINER_LOG_LEVEL=20
+    # Use the same entry point as SageMaker would use
+    entrypoint: ["python", "-m", "serve"]
+
+  # Client for testing SageMaker API locally
+  sagemaker-test-client:
+    build:
+      context: ./apps/controlnet/test_client
+      dockerfile: Dockerfile
+    depends_on:
+      - sagemaker-local
+    volumes:
+      - ./shared_results:/app/results
+    environment:
+      - SAGEMAKER_ENDPOINT=http://sagemaker-local:8080
+    command: ["tail", "-f", "/dev/null"] # Keep container running
+
+volumes:
+  huggingface_cache:
+    # Persistent volume for model cache to avoid re-downloading

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # ControlNet service for ML inference
   controlnet:
@@ -7,18 +5,31 @@ services:
       context: ./apps/controlnet
       dockerfile: Dockerfile
       target: production
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     ports:
       - "8080:8080"
     volumes:
       - ./shared_results:/app/results
       - huggingface_cache:/root/.cache/huggingface
     environment:
-      - PREFERRED_DEVICE=${PREFERRED_DEVICE:-auto}
+      - DEVICE=${DEVICE:-cuda}
       - PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
+      - MODEL=Lykon/DreamShaper
+      - CONTROLNET_MODEL=monster-labs/control_v1p_sd15_qrcode_monster
+      - CONTROLNET_TWO_MODEL=latentcat/control_v1p_sd15_brightness
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     restart: unless-stopped
-    # GPU configuration for NVIDIA GPUs
-
-    # For M1 Mac, comment out the above
 
   # Backend API service
   api:
@@ -29,7 +40,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - controlnet
+      controlnet:
+        condition: service_healthy
     environment:
       - PORT=3000
       - CONTROLNET_SERVICE_URL=http://controlnet:8080
@@ -52,6 +64,37 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:3000/api
       - NODE_ENV=production
     restart: unless-stopped
+
+  # SageMaker container for testing and cloud deployment
+  sagemaker-local:
+    build:
+      context: ./apps/controlnet
+      dockerfile: Dockerfile
+      platforms:
+        - ${DOCKER_PLATFORM:-linux/amd64}
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./shared_results:/tmp/results
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      - MODEL=digiplay/GhostMixV1.2VAE
+      - CONTROLNET_MODEL=monster-labs/control_v1p_sd15_qrcode_monster
+      - CONTROLNET_TWO_MODEL=latentcat/control_v1p_sd15_brightness
+      - DEVICE=${DEVICE:-cuda}
+      - LOG_LEVEL=INFO
+      # SageMaker specific environment variables
+      - SAGEMAKER_PROGRAM=sagemaker_serve.py
+      - SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/model
+      - SAGEMAKER_CONTAINER_LOG_LEVEL=20
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: "no"
 
 volumes:
   huggingface_cache:

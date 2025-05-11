@@ -5,12 +5,14 @@ class Config:
 
   LOG_LEVEL = os.environ.get("LOG_LEVEL", 'INFO')
 
-  MODEL = os.environ.get("MODEL", "Lykon/DreamShaper")
+  MODEL = os.environ.get("MODEL", "digiplay/GhostMixV1.2VAE")
   CONTROLNET_MODEL = os.environ.get('CONTROLNET_MODEL', "monster-labs/control_v1p_sd15_qrcode_monster")
   CONTROLNET_TWO_MODEL = os.environ.get('CONTROLNET_TWO_MODEL', "latentcat/control_v1p_sd15_brightness")
 
-  DEVICE = "cpu"
+  DEVICE = os.environ.get('DEVICE', 'cpu')
 
   NUM_INFERENCE_STEPS = int(os.environ.get("NUM_INFERENCE_STEPS", 30))
 
-  RESULTS_DIR = os.environ.get('RESULTS_DIR', './results')
+  INIT_IMAGE = os.environ.get('INIT_IMAGE', "./qrs/qr.png")
+
+  RESULTS_DIR = os.environ.get('RESULTS_DIR', '/opt/ml/model/results')

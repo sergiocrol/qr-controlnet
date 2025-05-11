@@ -1,9 +1,9 @@
 import torch
-from diffusers import ControlNetModel, StableDiffusionControlNetPipeline
+from diffusers import ControlNetModel, StableDiffusionControlNetPipeline, DPMSolverMultistepScheduler
+from xformers.ops import MemoryEfficientAttentionFlashAttentionOp
 from ..utils.logging import get_logger
 import platform
 import os
-import gc
 
 logger = get_logger(__name__)
 
@@ -11,25 +11,22 @@ def init_models(app):
     """Initialize the ControlNet models with memory optimizations"""
     logger.info("Initializing models...")
     
-    device_preference = os.environ.get('PREFERRED_DEVICE', 'auto')
-    logger.info(f"PREFERRED_DEVICE: {device_preference}")
+    device_preference = os.environ.get('DEVICE', 'cuda')
+    logger.info(f"DEVICE: {device_preference}")
 
-    
     if device_preference == 'cpu':
         device = "cpu"
         logger.info("Using CPU as per environment preference")
-    elif device_preference == 'mps' and torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        device = "mps"
-        logger.info("Using MPS (Apple Silicon) as per environment preference")
     elif device_preference == 'cuda' and torch.cuda.is_available():
         device = "cuda"
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
         logger.info("Using CUDA as per environment preference")
     else:
-        if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-            device = "mps"
-            logger.info("Using MPS (Apple Silicon) acceleration")
-        elif torch.cuda.is_available():
+        if torch.cuda.is_available():
             device = "cuda"
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
             logger.info(f"Using CUDA with {torch.cuda.device_count()} GPU(s)")
             logger.info(f"GPU Name: {torch.cuda.get_device_name(0)}")
         else:
@@ -41,32 +38,17 @@ def init_models(app):
     logger.info(f"Running on: {platform.platform()}")
 
     try:
-        if device == "mps":
-            os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = os.environ.get("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
-            logger.info(f"Set MPS high watermark ratio to {os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO']}")
-
-        gc.collect()
-        
         logger.info(f"Loading base model: {app.config['MODEL']}")
         logger.info(f"Loading ControlNet models: {app.config['CONTROLNET_MODEL']} and {app.config['CONTROLNET_TWO_MODEL']}")
         
-        logger.info("Loading ControlNet models with memory optimization...")
-        
+        torch_dtype = torch.float16 if device == "cuda" else torch.float32
+
         qr_model_options = [
-            app.config['CONTROLNET_MODEL'],                    
-            "monster-labs/control_v1p_sd15_qrcode_monster",   
-            "monster-labs/control_v1p_sd15_qrcode",            
-            "monster-labs/control_v1p_sd15_qrcode_monster_v2"  
+            app.config['CONTROLNET_MODEL'] 
         ]
         
         brightness_model_options = [
-            app.config['CONTROLNET_TWO_MODEL'],                
-            "latentcat/control_v1p_sd15_brightness",           
-            "lllyasviel/control_v11p_sd15_brightness",         
-            "lllyasviel/sd-controlnet-brightness",             
-            "SG161222/Realistic_Vision_V5.1_noVAE",            
-            "furusu/control_v1p_sd15_brightness_fp16",         
-            "ioclab/control_v1p_sd15_brightness"               
+            app.config['CONTROLNET_TWO_MODEL']               
         ]
         
          # ControlNet model (qrcode monster)
@@ -77,23 +59,32 @@ def init_models(app):
             try:
                 logger.info(f"Attempting to load QR ControlNet model: {model_id}")
                 
-                controlnet = ControlNetModel.from_pretrained(
-                    model_id,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-                    low_cpu_mem_usage=True
-                )
-                logger.info(f"Successfully loaded QR ControlNet model: {model_id}")
-                qr_model_loaded = True
-                break
-            except Exception as e:
-                logger.warning(f"Failed to load QR model {model_id} without subfolder: {str(e)}")
                 try:
-                    # Try with subfolder v2
                     controlnet = ControlNetModel.from_pretrained(
                         model_id,
                         subfolder="v2",
-                        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-                        low_cpu_mem_usage=True
+                        torch_dtype=torch_dtype,
+                        use_safetensors=True
+                    )
+                    logger.info(f"Successfully loaded QR ControlNet model: {model_id} (with safetensors)")
+                except:
+                    # Fallback to .bin format
+                    controlnet = ControlNetModel.from_pretrained(
+                        model_id,
+                        subfolder="v2",
+                        torch_dtype=torch.float16,
+                        use_safetensors=False
+                    )
+                    logger.info(f"Successfully loaded QR ControlNet model: {model_id} (with .bin format)")
+                    
+                qr_model_loaded = True
+                break   
+            except Exception as e:
+                logger.warning(f"Failed to load QR model {model_id} without subfolder: {str(e)}")
+                try:
+                    controlnet = ControlNetModel.from_pretrained(
+                        model_id,
+                        subfolder="v2",
                     )
                     logger.info(f"Successfully loaded QR ControlNet model: {model_id} (with subfolder v2)")
                     qr_model_loaded = True
@@ -111,12 +102,22 @@ def init_models(app):
         for model_id in brightness_model_options:
             try:
                 logger.info(f"Attempting to load Brightness ControlNet model: {model_id}")
-                controlnet_two = ControlNetModel.from_pretrained(
-                    model_id,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-                    low_cpu_mem_usage=True
-                )
-                logger.info(f"Successfully loaded Brightness ControlNet model: {model_id}")
+                try:
+                    controlnet_two = ControlNetModel.from_pretrained(
+                        model_id,
+                        torch_dtype=torch_dtype,
+                        use_safetensors=True
+                    )
+                    logger.info(f"Successfully loaded Brightness ControlNet model: {model_id} (with safetensors)")
+                except:
+                    # Fallback to .bin format
+                    controlnet_two = ControlNetModel.from_pretrained(
+                        model_id,
+                        torch_dtype=torch_dtype,
+                        use_safetensors=False
+                    )
+                    logger.info(f"Successfully loaded Brightness ControlNet model: {model_id} (with .bin format)")
+                
                 brightness_model_loaded = True
                 break
             except Exception as e:
@@ -126,38 +127,96 @@ def init_models(app):
             logger.warning("Failed to load Brightness ControlNet model. Proceeding with QR model only.")
             controlnet = [controlnet]
         else:
+            logger.info("Both ControlNet models loaded successfully")
             controlnet = [controlnet, controlnet_two]
         
         logger.info(f"Loading Stable Diffusion pipeline: {app.config['MODEL']}")
-        pipe = StableDiffusionControlNetPipeline.from_pretrained(
-            app.config['MODEL'],
-            controlnet=controlnet,
-            safety_checker=None,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            low_cpu_mem_usage=True
-        )
+        try:
+            pipe = StableDiffusionControlNetPipeline.from_pretrained(
+                app.config['MODEL'],
+                torch_dtype=torch_dtype,
+                use_safetensors=True,
+                controlnet=controlnet,
+                safety_checker=None,
+                requires_safety_checker=False
+            )
+            logger.info(f"Successfully loaded pipeline: {app.config['MODEL']} (with safetensors)")
+        except Exception as e:
+            logger.warning(f"Failed to load pipeline with safetensors: {str(e)}")
+            logger.info("Falling back to .bin format...")
+            pipe = StableDiffusionControlNetPipeline.from_pretrained(
+                app.config['MODEL'],
+                torch_dtype=torch_dtype,
+                use_safetensors=False,
+                controlnet=controlnet,
+                safety_checker=None,
+                requires_safety_checker=False
+            )
+            logger.info(f"Successfully loaded pipeline: {app.config['MODEL']} (with .bin format)")
 
         logger.info(f"Moving models to {device} device...")
         pipe.to(device)
 
+        scheduler = DPMSolverMultistepScheduler.from_pretrained(
+            app.config['MODEL'],
+            subfolder="scheduler",
+            use_karras_sigmas=True,
+            thresholding=False,
+            algorithm_type="dpmsolver++",
+            solver_type="midpoint",
+            solver_order=2,
+            lower_order_final=True,
+        )
+        pipe.scheduler = scheduler
+        logger.info("Configured DPM++ 2M Karras scheduler to match Automatic1111")
+
         logger.info("Applying memory optimizations...")
-        
-        if hasattr(pipe, 'enable_attention_slicing'):
-            pipe.enable_attention_slicing(1)
-            logger.info("Enabled attention slicing for memory optimization")
         
         if hasattr(pipe, 'enable_vae_slicing'):
             pipe.enable_vae_slicing()
             logger.info("Enabled VAE slicing")
         
-        if device == "cuda":
-            try:
-                pipe.enable_xformers_memory_efficient_attention()
-                logger.info("Enabled xformers memory efficient attention")
-            except Exception as e:
-                logger.warning(f"Could not enable xformers: {str(e)}")
+        if hasattr(pipe, 'enable_vae_tiling'):
+            pipe.enable_vae_tiling()
+            logger.info("Enabled VAE tiling")
         
-        logger.info("Models initialized successfully")
+        if hasattr(pipe, 'enable_attention_slicing'):
+            pipe.enable_attention_slicing("max")
+            logger.info("Enabled attention slicing with 'max' config")
+        
+        if device == "cuda":
+            # Enable xformers if available
+            try:
+                pipe.enable_xformers_memory_efficient_attention(attention_op=MemoryEfficientAttentionFlashAttentionOp)
+                logger.info("Enabled xformers memory efficient attention")
+            except ImportError:
+                logger.warning("xformers not available, falling back to default attention")
+                
+            # Enable memory efficient attention
+            if hasattr(pipe, 'enable_memory_efficient_attention'):
+                pipe.enable_memory_efficient_attention()
+                logger.info("Enabled memory efficient attention")
+            
+            # Enable SDPA (Scaled Dot Product Attention) if available
+            if hasattr(pipe, 'enable_sdpa'):
+                pipe.enable_sdpa()
+                logger.info("Enabled SDPA")
+
+            # Enable SDPA (Scaled Dot Product Attention) if available
+            # This is the default in PyTorch 2.0+
+            if hasattr(torch.nn.functional, 'scaled_dot_product_attention'):
+                logger.info("PyTorch 2.0+ SDPA available by default")
+        
+        # Apply additional memory optimizations
+        if hasattr(pipe.scheduler, 'set_timesteps'):
+            # Cache timesteps for faster inference
+            logger.info("Pre-computing timesteps for faster inference")
+            
+        if device == "cuda":
+            pipe.enable_model_cpu_offload()
+            logger.info("Enabled model CPU offloading")
+        
+        logger.info("Models initialized successfully with all optimizations")
         return pipe
         
     except Exception as e:

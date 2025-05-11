@@ -1,21 +1,24 @@
-
 # Core dependencies
+boto3==1.38.0
 torch==2.3.1
 torchvision==0.18.1
-torchaudio==2.3.1
-accelerate==0.32.1
 diffusers==0.29.2
 transformers==4.42.4
 Flask==3.0.3
 Pillow==10.2.0
-marshmallow==3.21.3
 numpy==1.26.3
 safetensors==0.4.3
+marshmallow==3.21.3
 
 # Optional dependencies for performance
 peft==0.10.0
-# xformers is often not needed on M1 Macs and can cause issues
-# xformers==0.0.24.post1
+
+# Replace the specific xformers version with a compatible one
+xformers>=0.0.21
+flash-attn>=2.0.0
 
 # Utilities
 tqdm==4.66.4
+
+omegaconf>=2.0.0
+einops
