@@ -78,7 +78,7 @@ services:
       - ./shared_results:/tmp/results
       - huggingface_cache:/root/.cache/huggingface
     environment:
-      - MODEL=Lykon/DreamShaper
+      - MODEL=digiplay/GhostMixV1.2VAE
       - CONTROLNET_MODEL=monster-labs/control_v1p_sd15_qrcode_monster
       - CONTROLNET_TWO_MODEL=latentcat/control_v1p_sd15_brightness
       - DEVICE=${DEVICE:-cuda}

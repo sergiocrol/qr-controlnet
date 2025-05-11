@@ -47,7 +47,7 @@ RUN chmod +x /opt/program/serve
 EXPOSE 8080
 
 # Environment variables
-ENV MODEL="Lykon/DreamShaper" \
+ENV MODEL="digiplay/GhostMixV1.2VAE" \
     CONTROLNET_MODEL="monster-labs/control_v1p_sd15_qrcode_monster" \
     CONTROLNET_TWO_MODEL="latentcat/control_v1p_sd15_brightness" \
     RESULTS_DIR="/opt/ml/model/results" \

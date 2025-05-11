@@ -1,11 +1,9 @@
 import torch
-import xformers
-from diffusers import ControlNetModel, StableDiffusionControlNetPipeline
+from diffusers import ControlNetModel, StableDiffusionControlNetPipeline, DPMSolverMultistepScheduler
 from xformers.ops import MemoryEfficientAttentionFlashAttentionOp
 from ..utils.logging import get_logger
 import platform
 import os
-import gc
 
 logger = get_logger(__name__)
 
@@ -40,12 +38,9 @@ def init_models(app):
     logger.info(f"Running on: {platform.platform()}")
 
     try:
-        gc.collect()
-        
         logger.info(f"Loading base model: {app.config['MODEL']}")
         logger.info(f"Loading ControlNet models: {app.config['CONTROLNET_MODEL']} and {app.config['CONTROLNET_TWO_MODEL']}")
         
-        logger.info("Loading ControlNet models with memory optimization...")
         torch_dtype = torch.float16 if device == "cuda" else torch.float32
 
         qr_model_options = [
@@ -77,7 +72,7 @@ def init_models(app):
                     controlnet = ControlNetModel.from_pretrained(
                         model_id,
                         subfolder="v2",
-                        torch_dtype=torch_dtype,
+                        torch_dtype=torch.float16,
                         use_safetensors=False
                     )
                     logger.info(f"Successfully loaded QR ControlNet model: {model_id} (with .bin format)")
@@ -162,6 +157,18 @@ def init_models(app):
         logger.info(f"Moving models to {device} device...")
         pipe.to(device)
 
+        scheduler = DPMSolverMultistepScheduler.from_pretrained(
+            app.config['MODEL'],
+            subfolder="scheduler",
+            use_karras_sigmas=True,
+            thresholding=False,
+            algorithm_type="dpmsolver++",
+            solver_type="midpoint",
+            solver_order=2,
+            lower_order_final=True,
+        )
+        pipe.scheduler = scheduler
+        logger.info("Configured DPM++ 2M Karras scheduler to match Automatic1111")
 
         logger.info("Applying memory optimizations...")
         

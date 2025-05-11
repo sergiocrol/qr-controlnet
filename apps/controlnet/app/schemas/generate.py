@@ -26,6 +26,8 @@ class GenerateImageSchema(Schema):
     sampler = fields.String(missing=default_sampler)
     guidance_scale = fields.Float(missing=default_guidance_scale)
     model = fields.String(missing=default_model)
+    seed = fields.Integer(missing=None)  # Add seed parameter
+    guess_mode = fields.Boolean(missing=False)  # Add guess_mode for Control Mode
 
     @validates('controlnet_conditioning_scale')
     def validate_controlnet_conditioning_scale(self, value):
@@ -75,6 +77,11 @@ class GenerateImageSchema(Schema):
     def validate_guidance_scale(self, value):
         if value < 1.0 or value > 20.0:
             raise ValidationError('guidance_scale must be between 1.0 and 20.0')
+    
+    @validates('seed')
+    def validate_seed(self, value):
+        if value is not None and (value < 0 or value > 2**32):
+            raise ValidationError('Seed must be between 0 and 2^32')
         
     @validates('model')
     def validate_model(self, value):
@@ -96,3 +103,5 @@ class SageMakerRequestSchema(Schema):
     sampler = fields.String()
     guidance_scale = fields.Float(validate=validate.Range(min=1.0, max=20.0))
     model = fields.String()
+    seed = fields.Integer(validate=validate.Range(min=0, max=2**32))
+    guess_mode = fields.Boolean()

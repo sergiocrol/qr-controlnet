@@ -147,9 +147,23 @@ class QRControlNetInference:
     print(f"Starting generation with prompt: {prompt}")
     print(f"kwargs: {kwargs}")
 
+    seed = kwargs.get("seed", None)
+    if seed is not None:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+        print(f"Set seed to: {seed}")
+
     try:
+      # Load and preprocess the QR code image to match Automatic1111's behavior
       image = Image.open(DEFAULT_QR_PATH).convert("RGB")
       print(f"Loaded default QR code with size: {image.size}")
+      
+      # Resize image to match Processor Res: 512 from Automatic1111
+      target_size = (512, 512)
+      image = image.resize(target_size, Image.LANCZOS)
+      print(f"Resized QR code to: {image.size}")
     except Exception as e:
       print(f"Failed to load default QR code from {DEFAULT_QR_PATH}: {str(e)}")
       alternative_paths = [
@@ -160,12 +174,14 @@ class QRControlNetInference:
       ]
       for alt_path in alternative_paths:
         try:
-          print(f"Trying alternative path: {alt_path}")
-          image = Image.open(alt_path).convert("RGB")
-          print(f"Successfully loaded QR code from {alt_path}")
-          break
+            print(f"Trying alternative path: {alt_path}")
+            image = Image.open(alt_path).convert("RGB")
+            # Apply same preprocessing
+            image = image.resize(target_size, Image.LANCZOS)
+            print(f"Successfully loaded and resized QR code from {alt_path}")
+            break
         except Exception as alt_e:
-          print(f"Failed to load from {alt_path}: {str(alt_e)}")
+            print(f"Failed to load from {alt_path}: {str(alt_e)}")
       else:
         raise
     
@@ -174,39 +190,52 @@ class QRControlNetInference:
       self.pipe.scheduler = self.get_scheduler(sampler)
       print(f"Using sampler: {sampler}")
 
+    # Configure ControlNet parameters to match Automatic1111
     controlnet_scale = kwargs.get("controlnet_conditioning_scale")
     if controlnet_scale is None:
-      controlnet_scale = [1.0, 0.5]
+        controlnet_scale = [1.25, 0.1]  # Default to match A1111 example
     elif not isinstance(controlnet_scale, list):
-      controlnet_scale = [controlnet_scale, controlnet_scale]
+        controlnet_scale = [controlnet_scale, controlnet_scale]
     
     start = kwargs.get("control_guidance_start")
     end = kwargs.get("control_guidance_end")  
 
+    # Final image dimensions
+    height = kwargs.get("height", 1024)
+    width = kwargs.get("width", 1024)
+    
+    # Ensure dimensions are divisible by 8
+    height = (height // 8) * 8
+    width = (width // 8) * 8
+
     params = {
-      "negative_prompt": kwargs.get("negative_prompt", "ugly, blurry, pixelated, low quality, text, watermark"),
-      "num_inference_steps": kwargs.get("num_inference_steps", 30),
-      "controlnet_conditioning_scale": controlnet_scale,
-      "control_guidance_start": [0.0, 0.0] if start is None else (start if isinstance(start, list) else [start, start]),
-      "control_guidance_end": [1.0, 1.0] if end is None else (end if isinstance(end, list) else [end, end]),
-      "height": kwargs.get("height", 768),
-      "width": kwargs.get("width", 768),
-      "guidance_scale": kwargs.get("guidance_scale", 7.5),
+        "negative_prompt": kwargs.get("negative_prompt", "ugly, disfigured, low quality, blurry, nsfw"),
+        "num_inference_steps": kwargs.get("num_inference_steps", 40),  # Match A1111 default
+        "controlnet_conditioning_scale": controlnet_scale,
+        "control_guidance_start": [0.0, 0.1] if start is None else (start if isinstance(start, list) else [start, start]),
+        "control_guidance_end": [1.0, 1.0] if end is None else (end if isinstance(end, list) else [end, end]),
+        "height": height,
+        "width": width,
+        "guidance_scale": kwargs.get("guidance_scale", 7.0),  # CFG scale from A1111
+        "eta": 0.0,  # Match A1111's default
     }
+
+     # Add guess_mode parameter to match A1111's "Control Mode: Balanced"
+    guess_mode = kwargs.get("guess_mode", False)
+    
     print(f"Parameter values: {params}")
 
     print(f"Running inference with prompt: {prompt[:50]}...")
-    seed = kwargs.get("seed", None)
-    if seed is not None:
-        generator = torch.Generator(device=self.device).manual_seed(seed)
-    else:
-        generator = None
+
+    # Final image processing - resize to match "Crop and Resize" mode
+    # This ensures the QR code image matches the output dimensions
+    qr_image_processed = image.resize((width, height), Image.LANCZOS)
 
     result = self.pipe(
-      prompt=prompt,
-      image=[image, image],
-      generator=generator,
-      **params
+        prompt=prompt,
+        image=[qr_image_processed, qr_image_processed],  # Same image for both controlnets
+        guess_mode=[guess_mode, guess_mode],  # Control Mode: Balanced
+        **params
     )
 
     # Get the generated image
@@ -224,8 +253,9 @@ class QRControlNetInference:
     img_str = base64.b64encode(buffered.getvalue()).decode()
 
     return {
-      "image": img_str,
-      "output_path": output_path
+        "image": img_str,
+        "output_path": output_path,
+        "seed": seed if seed else "random"
     }
   
 model = None
