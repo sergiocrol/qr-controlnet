@@ -10,7 +10,7 @@ class GenerateImageSchema(Schema):
     default_control_guidance_end = [1, 1]
     default_size = 512
     default_sampler = "dpm++_2m_karras"
-    default_guidance_scale = 7.5
+    default_guidance_scale = 7
     default_model = "ghostmix"
 
     prompt = fields.String(required=True)

@@ -167,6 +167,7 @@ def init_models(app):
             solver_order=2,
             lower_order_final=True,
         )
+
         pipe.scheduler = scheduler
         logger.info("Configured DPM++ 2M Karras scheduler to match Automatic1111")
 
