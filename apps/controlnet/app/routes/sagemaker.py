@@ -28,7 +28,7 @@ def generate_async(data):
       "height": data.get("height", 1024),
       "width": data.get("width", 1024),
       "sampler": data.get("sampler", "dpm++_2m_karras"),
-      "guidance_scale": data.get("guidance_scale", 7.5),
+      "guidance_scale": data.get("guidance_scale", 7),
       "model": data.get("model", "ghostmix"),
     }
 

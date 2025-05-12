@@ -51,7 +51,7 @@ def create_app(config_class=Config):
         height=input_data.get("height"),
         width=input_data.get("width"),
         sampler=input_data.get("sampler", "dpm++_2m_karras"),
-        guidance_scale=input_data.get("guidance_scale", 7.5),
+        guidance_scale=input_data.get("guidance_scale", 7),
         model=input_data.get("model"),
       )
 
